@@ -1,0 +1,97 @@
+/* style.css — the look of Porto Lumen's menus and HUD: warm sunset tones
+   over the game, big readable type, nothing that needs a network font. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #141210; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #f5efe2; }
+#game { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.hidden { display: none !important; }
+
+/* Overlays: the start screen, the pause menu and the game-over screen. */
+.overlay {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(12, 10, 8, 0.55); backdrop-filter: blur(2px); z-index: 20;
+}
+.panel {
+  max-width: 640px; width: calc(100% - 48px); padding: 36px 40px; text-align: center;
+  background: linear-gradient(160deg, rgba(38, 28, 20, 0.96), rgba(20, 16, 12, 0.96));
+  border: 1px solid rgba(255, 200, 90, 0.35); border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+.panel.small { max-width: 420px; }
+.panel h1 {
+  font-size: 52px; letter-spacing: 6px; color: #ffd23c;
+  text-shadow: 0 3px 0 #b3402e, 0 8px 24px rgba(0, 0, 0, 0.7);
+}
+.panel h2 { font-size: 34px; letter-spacing: 4px; color: #ffd23c; margin-bottom: 10px; }
+.tagline { margin: 14px 0 22px; font-size: 16px; line-height: 1.5; color: #e8dcc8; }
+.buttons { display: flex; flex-direction: column; gap: 10px; align-items: center; margin: 8px 0 20px; }
+button {
+  font: inherit; font-weight: 700; font-size: 16px; padding: 12px 28px; min-width: 240px;
+  color: #1a140e; background: #ffd23c; border: none; border-radius: 8px; cursor: pointer;
+  transition: transform 0.1s, background 0.1s;
+}
+button:hover { background: #ffe08a; transform: translateY(-1px); }
+button.primary { background: #ff9a2e; color: #1a140e; }
+button.primary:hover { background: #ffb35c; }
+.controls {
+  text-align: left; font-size: 13px; line-height: 1.9; color: #cfc4ae;
+  border-top: 1px solid rgba(255, 255, 255, 0.14); padding-top: 16px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px;
+}
+.controls b { color: #ffd23c; }
+.credits { margin-top: 18px; font-size: 12px; color: #9a8f7a; line-height: 1.5; }
+#gameover-text { margin: 6px 0 18px; color: #e8dcc8; line-height: 1.5; }
+
+/* The HUD. */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-weight: 600; }
+.hud-top-left { position: absolute; top: 16px; left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.health { display: flex; align-items: center; gap: 8px; }
+.health .bar {
+  width: 180px; height: 16px; background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px; overflow: hidden;
+}
+.health .fill { height: 100%; background: #7ee787; transition: width 0.2s; }
+.health .fill.low { background: #ff5a3c; }
+#hud-health-text { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+.money { font-size: 22px; color: #7ee787; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+.stars { font-size: 20px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.55); text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+.stars.wanted { color: #ffd23c; }
+.district { font-size: 15px; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+.clock { font-size: 14px; color: #e8dcc8; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+.hud-top-right { position: absolute; top: 16px; right: 18px; }
+#minimap { border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); background: #c9b896; }
+.objective {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  max-width: 560px; padding: 8px 18px; text-align: center; font-size: 15px;
+  background: rgba(0, 0, 0, 0.55); border-radius: 8px; border: 1px solid rgba(255, 210, 60, 0.4);
+}
+.speed {
+  position: absolute; bottom: 18px; right: 20px; font-size: 26px; display: none;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+.speed.show { display: block; }
+.toast {
+  position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%);
+  max-width: 640px; padding: 10px 20px; text-align: center; font-size: 15px; line-height: 1.4;
+  background: rgba(20, 16, 10, 0.85); border: 1px solid rgba(255, 210, 60, 0.5); border-radius: 8px;
+  opacity: 0; transition: opacity 0.3s;
+}
+.toast.show { opacity: 1; }
+.prompt {
+  position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+  padding: 8px 18px; font-size: 15px; background: rgba(255, 210, 60, 0.92); color: #1a140e;
+  border-radius: 8px; opacity: 0; transition: opacity 0.2s;
+}
+.prompt.show { opacity: 1; }
+.bust {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  display: none; align-items: center; gap: 10px; padding: 8px 16px;
+  background: rgba(120, 10, 10, 0.85); border-radius: 8px; font-size: 14px;
+}
+.bust.show { display: flex; }
+.bust .bar { width: 160px; height: 12px; background: rgba(0, 0, 0, 0.5); border-radius: 6px; overflow: hidden; }
+.bust .fill { height: 100%; background: #ff5a3c; }
+.hint {
+  position: absolute; bottom: 18px; left: 20px; font-size: 12px; font-weight: 400;
+  color: rgba(255, 255, 255, 0.65); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}

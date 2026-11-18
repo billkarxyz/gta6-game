@@ -1,64 +1,48 @@
-// Saving: the player's place in the story, kept in localStorage between visits. What is saved
-// is small on purpose — position, health, money, ammo, the job and stage, the wanted level and
-// the clock — so a save is a few hundred bytes and loads in a blink. Traffic, pedestrians and
-// police are rebuilt fresh on load: the city is always alive again.
-import { SAVE_KEY } from './config.js';
+// save.js — the game saves to localStorage: the player's position, money,
+// health, mission progress and the clock. The start screen offers to
+// continue from the save, and the game saves on every mission completion
+// and whenever the player reaches the safehouse.
+const KEY = 'porto-lumen-save-v1';
 
-/** Save the game's state; silent when storage is off (a private window). */
-export function saveGame(state) {
+export function saveGame(game) {
+  const p = game.player;
   try {
-    const player = state.player;
-    const data = {
-      version: 1,
-      x: Math.round(player.x),
-      y: Math.round(player.y),
-      health: Math.round(player.health),
-      money: player.money,
-      ammo: player.ammo,
-      missionIndex: state.missions.index,
-      missionStage: state.missions.stage,
-      missionCollected: state.missions.collected,
-      wanted: state.wanted,
-      clock: Math.round(state.clock),
+    localStorage.setItem(KEY, JSON.stringify({
+      x: p.x,
+      y: p.y,
+      health: p.health,
+      money: p.money,
+      ammo: p.ammo,
+      missionIndex: game.missions.index,
+      completed: game.missions.completed,
+      clock: game.clock,
       savedAt: Date.now(),
-    };
-    window.localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    return true;
-  } catch {
-    return false;
+    }));
+  } catch (e) {
+    // Storage may be unavailable (private mode); the game plays on without it.
   }
 }
 
-/** Load a save, or null when there is none or it does not parse. */
-export function loadGame() {
+export function loadSave() {
   try {
-    const raw = window.localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || data.version !== 1) return null;
+    if (typeof data.x !== 'number' || typeof data.money !== 'number') return null;
     return data;
-  } catch {
+  } catch (e) {
     return null;
   }
 }
 
-/** True when a save exists to continue from. */
 export function hasSave() {
-  return loadGame() !== null;
+  return loadSave() !== null;
 }
 
-/** Apply a loaded save to a fresh state: the player, the money, the job, the clock. */
-export function applySave(state, data) {
-  const player = state.player;
-  player.x = data.x;
-  player.y = data.y;
-  player.health = data.health;
-  player.money = data.money;
-  player.ammo = data.ammo;
-  state.missions.index = data.missionIndex;
-  state.missions.stage = data.missionStage;
-  state.missions.collected = data.missionCollected;
-  state.missions.started = false;
-  state.wanted = data.wanted;
-  state.clock = data.clock;
+export function clearSave() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch (e) {
+    // Ignore: nothing to clear.
+  }
 }

@@ -4,10 +4,10 @@
 // from beside this file to /output and writes /output/dossier.json, the summary the judge reads,
 // with the vendored make.fun library.
 //
-// The game is Solmar, City of Gold: a complete open-world crime game in the spirit of GTA, built
-// as a top-down 2D canvas game. A sun-soaked coastal city to explore on foot and by car, traffic
-// and pedestrians, cars to steal and drive, a five-star wanted level with police who chase and
-// bust, five story missions for the fixer Lena Ortiz, combat, a HUD with a minimap, a start
+// The game is Porto Lumen: a complete open-world crime game in the spirit of GTA, built as a
+// top-down 2D canvas game. A sun-soaked coastal city to explore on foot and by car, traffic and
+// pedestrians, cars to steal and drive, a five-star wanted level with police who chase and bust,
+// five story missions for the fixer Vera Castellanos, combat, a HUD with a minimap, a start
 // screen and a save. Everything is original: the city, the names, the story, the art and the
 // synthesised sound are this entry's own.
 //

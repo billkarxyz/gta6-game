@@ -1,155 +1,66 @@
-// Every tuning number, colour and name in one place. The world is a fixed 3600x2800 city;
-// the renderer scales a camera view of it to the window, so no rule depends on the screen size.
+// config.js — tuning and constants for Porto Lumen, the game's city.
+// Everything that shapes how the city looks and how the game feels lives here,
+// so the other files read numbers from this one place instead of inventing them.
+export const WORLD_W = 3600;
+export const WORLD_H = 2800;
+export const ROAD_W = 96;
+export const AVENUES = [300, 700, 1100, 1500, 1900, 2300, 2700, 3100];
+export const STREETS = [250, 600, 950, 1300, 1650, 2000, 2350];
+export const WATER_Y = 2520; // below this line is the sea
+export const SAND_Y = 2405; // sand starts here, water below WATER_Y
+export const SIDEWALK = 18; // sidewalk width along each road
 
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
+// The player on foot.
+export const WALK_SPEED = 175;
+export const RUN_SPEED = 300;
+export const PLAYER_RADIUS = 13;
 
-/** The city of Solmar: a sun-soaked coastal grid, roads every 400 units, beach along the south. */
-export const WORLD = { width: 3600, height: 2800, roadWidth: 100, roadGap: 400 };
-export const ROAD_XS = [300, 700, 1100, 1500, 1900, 2300, 2700, 3100];
-export const ROAD_YS = [300, 700, 1100, 1500, 1900, 2300];
-/** South of this the beach starts; south of the water line is the sea, out of bounds. */
-export const BEACH_Y = 2500;
-export const WATER_Y = 2660;
-
-/** The seed that builds the city itself: the same streets, buildings and parks every game. */
-export const CITY_SEED = 20261119;
-
-export const DISTRICTS = [
-  { name: 'Old Town', x0: 0, y0: 0, x1: 1500, y1: 1100 },
-  { name: 'Harbor Heights', x0: 1500, y0: 0, x1: 3600, y1: 1100 },
-  { name: 'Downtown', x0: 0, y0: 1100, x1: 2000, y1: 1900 },
-  { name: 'Palm District', x0: 0, y0: 1900, x1: 1500, y1: 2500 },
-  { name: 'The Docks', x0: 2000, y0: 1100, x1: 3600, y1: 2500 },
-  { name: 'Marina Bay', x0: 0, y0: 2500, x1: 3600, y1: 2800 },
-];
-
-/** Named places the story and the HUD point at. */
-export const PLACES = {
-  garage: { name: "Lena's Garage", x: 1500, y: 1100 },
-  spray: { name: 'Spray Shop', x: 700, y: 1900 },
-  safehouse: { name: 'Safehouse', x: 2700, y: 700 },
-  docks: { name: 'Pier 9', x: 3100, y: 2300 },
-  plaza: { name: 'Solmar Plaza', x: 1100, y: 1500 },
-  marina: { name: 'Marina', x: 1900, y: 2500 },
+// Cars: arcade handling. Each type has a top speed, acceleration and grip.
+export const CAR_TYPES = {
+  sedan: { top: 330, accel: 230, grip: 2.6, len: 46, wid: 22, health: 100 },
+  taxi: { top: 320, accel: 220, grip: 2.6, len: 46, wid: 22, health: 100 },
+  sports: { top: 460, accel: 330, grip: 3.1, len: 48, wid: 22, health: 80 },
+  truck: { top: 250, accel: 150, grip: 2.1, len: 58, wid: 26, health: 160 },
+  van: { top: 270, accel: 170, grip: 2.2, len: 54, wid: 24, health: 130 },
+  police: { top: 420, accel: 310, grip: 3.0, len: 48, wid: 22, health: 140 },
 };
+export const CAR_COLORS = ['#d8d3c8', '#b3402e', '#2e6db3', '#d9a521', '#3e8e5a', '#7a4a9e', '#c96a2e', '#4a4a52', '#e8e4da', '#2e8e8e'];
+export const TRAFFIC_COUNT = 22;
+export const PED_COUNT = 38;
 
-export const PLAYER = {
-  radius: 13,
-  walkSpeed: 170,
-  runSpeed: 300,
-  maxHealth: 100,
-  enterRange: 70,
-  startX: 1500,
-  startY: 1180,
-};
+// Wanted system: heat points turn into stars; police pressure follows the stars.
+export const HEAT_PER_STAR = 100;
+export const HEAT_STEAL = 60; // stealing a car while a cop can see it
+export const HEAT_HIT_PED = 80;
+export const HEAT_SHOOT = 40;
+export const HEAT_KILL_COP = 200;
+export const HEAT_RAM_COP = 70;
+export const RESPRAY_COST = 100;
+export const COP_VIEW = 520; // a cop this close sees the player's crimes
 
-export const CAR = {
-  length: 64,
-  width: 32,
-  accel: 420,
-  brake: 700,
-  reverseAccel: 260,
-  maxSpeed: 620,
-  maxReverse: 180,
-  turnRate: 2.6,
-  grip: 6.5,
-  handbrakeGrip: 1.6,
-  maxHealth: 100,
-  enterRange: 70,
-};
+// Combat and pickups.
+export const PISTOL_DAMAGE = 34;
+export const PISTOL_MAG = 12;
+export const PISTOL_RANGE = 420;
+export const PICKUP_RADIUS = 26;
 
-export const TRAFFIC = {
-  count: 22,
-  speed: 150,
-  speedJitter: 60,
-  minGap: 90,
-};
+// The clock: the game starts at 08:00 and one game hour passes every 100 real seconds.
+export const CLOCK_START = 8 * 3600;
+export const CLOCK_RATE = 36; // game seconds per real second
 
-export const PEDS = { count: 40, walkSpeed: 55, fleeSpeed: 190, fleeRadius: 220 };
-
-export const POLICE = {
-  /** Police cars on the hunt at each wanted level (index = stars). */
-  chaseCount: [0, 2, 3, 4, 5, 6],
-  speed: 560,
-  ramDamage: 8,
-  /** Seconds a cop must stay beside a slow player to bust them. */
-  bustTime: 3,
-  bustRange: 90,
-  bustSpeed: 60,
-  /** Seconds out of every cop's sight before one star drops. */
-  decaySeconds: 12,
-  sightRange: 620,
-};
-
-export const WANTED = {
-  stealCar: 1,
-  hitPed: 1,
-  shoot: 1,
-  hitPolice: 2,
-  killPolice: 1,
-  max: 5,
-  sprayCost: 100,
-};
-
-export const COMBAT = {
-  bulletSpeed: 900,
-  bulletLife: 0.9,
-  fireInterval: 0.22,
-  pistolDamage: 34,
-  carRamDamage: 12,
-  explosionRadius: 130,
-  explosionDamage: 80,
-  ammoPickup: 24,
-  healthPickup: 40,
-};
-
-export const PICKUPS = {
-  health: { count: 8, color: '#7ee081' },
-  ammo: { count: 8, color: '#f2c94c' },
-  money: { count: 10, color: '#4fc3f7' },
-  moneyValue: 50,
-};
-
-export const CAMERA = { lookAhead: 90, smoothing: 5 };
-
+// Sun-soaked palette. The city is drawn in warm light: pale roads, sand sidewalks,
+// pastel buildings, a turquoise sea.
 export const PALETTE = {
-  backdrop: '#0d1117',
-  grass: '#7fae5a',
-  park: '#6da34e',
-  sand: '#e8d29a',
-  water: '#2e7fa8',
-  road: '#3a3f47',
-  roadEdge: '#2c3038',
-  sidewalk: '#9aa0a8',
-  lane: '#e8e3c8',
-  building: ['#c96f4a', '#d9a441', '#7d9bb5', '#b5b5a8', '#a86a8f', '#6f9e7e', '#c9c2b4', '#8a7fb8'],
-  roof: ['#8a4a30', '#a87a2e', '#5a748c', '#8c8c7e', '#7d4a68', '#4f7a5c', '#9a9284', '#655a92'],
-  window: '#ffe9a8',
-  tree: '#3f7a3a',
-  player: '#f2c94c',
-  playerCar: '#e5534b',
-  police: '#2f6fd0',
-  policeLight: ['#ff3b30', '#3b82ff'],
-  text: '#f5f1e6',
-  muted: '#b9b3a3',
-  panel: '#171a20',
-  accent: '#f2a33c',
-  star: '#ffd94a',
-  health: '#7ee081',
-  danger: '#e5534b',
-};
-
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-
-/** Where the save lives between visits (this browser only). */
-export const SAVE_KEY = 'solmar-city.save.v1';
-
-/** The game's own names: the city, the player, and the people of its story. */
-export const STORY = {
-  city: 'Solmar',
-  player: 'Jax Marlow',
-  fixer: 'Lena Ortiz',
-  dealer: 'Tomas Ruiz',
-  detective: 'Detective Rosa Kane',
+  ground: '#c9b896', // bare earth between blocks
+  road: '#4a4a52',
+  roadLine: '#d8d3c8',
+  sidewalk: '#d9cba8',
+  sand: '#e8d9a8',
+  sea: '#2e8fb3',
+  seaDeep: '#1e6d8c',
+  park: '#6da85c',
+  parkDark: '#558a48',
+  plaza: '#cbb98e',
+  buildingRoof: ['#e8dcc8', '#d9a08e', '#a8c8c8', '#e8d18a', '#c8b8d8', '#b8d0a8', '#d8b090', '#c8ccd8'],
+  buildingEdge: 'rgba(0,0,0,0.25)',
 };

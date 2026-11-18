@@ -1,87 +1,86 @@
-// Effects with no rules of their own: particles (smoke, fire, sparks, blood, cash), skid marks
-// left by hard braking, and the camera's screen shake. Each effect is a small object in a pool;
-// the renderer draws them, and update() ages them out.
-const MAX_PARTICLES = 400;
-const MAX_SKIDS = 600;
-
-/** A puff of smoke and fire at an explosion, with sparks flying out. */
-export function addExplosion(state, x, y) {
-  for (let i = 0; i < 26; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 60 + Math.random() * 320;
-    addParticle(state, x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.5 + Math.random() * 0.7, 4 + Math.random() * 8, i % 3 === 0 ? '#ff9a3c' : i % 3 === 1 ? '#e5534b' : '#5a5a5a');
-  }
-  shake(state, 14);
+// effects.js — particles, skid marks and screen shake: the feedback that
+// makes a crash feel like a crash and a shot feel like a shot. Particles
+// are plain objects in one list, updated and drawn by render.js.
+export function createEffects() {
+  return { particles: [], skids: [], shake: 0, flashes: [] };
 }
 
-/** A short burst of sparks where metal hits metal. */
-export function addSparks(state, x, y) {
-  for (let i = 0; i < 6; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 80 + Math.random() * 200;
-    addParticle(state, x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.2 + Math.random() * 0.25, 2 + Math.random() * 2, '#ffd94a');
-  }
+export function addShake(fx, amount) {
+  fx.shake = Math.min(18, fx.shake + amount);
 }
 
-/** A red puff where a bullet lands on a person. */
-export function addHitPuff(state, x, y) {
-  for (let i = 0; i < 5; i += 1) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 30 + Math.random() * 90;
-    addParticle(state, x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, 0.3 + Math.random() * 0.3, 3 + Math.random() * 3, '#c0392b');
-  }
-}
-
-/** Grey smoke from a damaged car's engine, and from burning wrecks. */
-export function addSmoke(state, x, y) {
-  addParticle(state, x, y, (Math.random() - 0.5) * 20, -30 - Math.random() * 30, 0.8 + Math.random() * 0.6, 5 + Math.random() * 6, '#8a8a8a');
-}
-
-/** A bright flash at the muzzle when the player fires. */
-export function addMuzzle(state, x, y, angle) {
-  addParticle(state, x + Math.cos(angle) * 18, y + Math.sin(angle) * 18, Math.cos(angle) * 120, Math.sin(angle) * 120, 0.06, 6, '#ffe9a8');
-}
-
-/** Green notes flying up when cash is collected. */
-export function addCashBurst(state, x, y) {
-  for (let i = 0; i < 8; i += 1) {
-    addParticle(state, x, y, (Math.random() - 0.5) * 160, -60 - Math.random() * 120, 0.6 + Math.random() * 0.4, 3 + Math.random() * 3, '#7ee081');
-  }
-}
-
-export function addParticle(state, x, y, vx, vy, life, size, colour) {
-  if (state.particles.length >= MAX_PARTICLES) state.particles.shift();
-  state.particles.push({ x, y, vx, vy, life, maxLife: life, size, colour });
-}
-
-/** A skid mark segment at a wheel: the renderer draws the trail as fading dark strokes. */
-export function addSkid(state, x, y, angle) {
-  if (state.skids.length >= MAX_SKIDS) state.skids.shift();
-  state.skids.push({ x, y, angle, life: 6 });
-}
-
-/** Jolt the camera; the shake decays on its own. */
-export function shake(state, amount) {
-  state.shake = Math.min(20, state.shake + amount);
-}
-
-/** Age every effect by dt; dead ones are dropped. */
-export function updateEffects(state, dt) {
-  for (let i = state.particles.length - 1; i >= 0; i -= 1) {
-    const p = state.particles[i];
+export function updateEffects(fx, dt) {
+  fx.shake = Math.max(0, fx.shake - dt * 40);
+  for (let i = fx.particles.length - 1; i >= 0; i--) {
+    const p = fx.particles[i];
     p.life -= dt;
     if (p.life <= 0) {
-      state.particles.splice(i, 1);
+      fx.particles.splice(i, 1);
       continue;
     }
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.vx *= 1 - 2.2 * dt;
     p.vy *= 1 - 2.2 * dt;
+    if (p.grow) p.r += p.grow * dt;
   }
-  for (let i = state.skids.length - 1; i >= 0; i -= 1) {
-    state.skids[i].life -= dt;
-    if (state.skids[i].life <= 0) state.skids.splice(i, 1);
+  for (let i = fx.skids.length - 1; i >= 0; i--) {
+    fx.skids[i].life -= dt;
+    if (fx.skids[i].life <= 0) fx.skids.splice(i, 1);
   }
-  state.shake = Math.max(0, state.shake - 30 * dt);
+  for (let i = fx.flashes.length - 1; i >= 0; i--) {
+    fx.flashes[i].life -= dt;
+    if (fx.flashes[i].life <= 0) fx.flashes.splice(i, 1);
+  }
+}
+
+function burst(fx, x, y, count, color, speed, life, size) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const v = speed * (0.3 + Math.random() * 0.7);
+    fx.particles.push({
+      x, y,
+      vx: Math.cos(a) * v,
+      vy: Math.sin(a) * v,
+      r: size * (0.5 + Math.random()),
+      life: life * (0.5 + Math.random() * 0.5),
+      maxLife: life,
+      color,
+    });
+  }
+}
+
+export function explosion(fx, x, y) {
+  burst(fx, x, y, 26, '#ff9a2e', 260, 0.7, 7);
+  burst(fx, x, y, 16, '#ffdd55', 180, 0.45, 5);
+  burst(fx, x, y, 12, '#5a5a5a', 90, 1.6, 9);
+  fx.flashes.push({ x, y, r: 90, life: 0.12, maxLife: 0.12 });
+  addShake(fx, 14);
+}
+
+export function sparks(fx, x, y) {
+  burst(fx, x, y, 8, '#ffd94a', 200, 0.35, 3);
+}
+
+export function smoke(fx, x, y) {
+  fx.particles.push({
+    x: x + (Math.random() - 0.5) * 8, y: y + (Math.random() - 0.5) * 8,
+    vx: (Math.random() - 0.5) * 20, vy: -30 - Math.random() * 20,
+    r: 6, life: 1.1, maxLife: 1.1, color: 'rgba(90,90,90,0.5)', grow: 6,
+  });
+}
+
+export function muzzle(fx, x, y) {
+  fx.flashes.push({ x, y, r: 16, life: 0.05, maxLife: 0.05 });
+  burst(fx, x, y, 3, '#ffe08a', 160, 0.12, 2);
+}
+
+export function pickupBurst(fx, x, y, color) {
+  burst(fx, x, y, 10, color || '#7ee787', 120, 0.5, 4);
+}
+
+// A skid mark segment between two points, left by a hard turn or a handbrake.
+export function addSkid(fx, x1, y1, x2, y2) {
+  if (fx.skids.length > 400) fx.skids.shift();
+  fx.skids.push({ x1, y1, x2, y2, life: 6 });
 }

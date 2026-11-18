@@ -1,166 +1,146 @@
-// The city of Solmar: its streets, blocks, buildings, parks and beach, built once from a fixed
-// seed so every game plays the same city. The layout is a grid: roads every 400 units, blocks
-// between them holding buildings or a park, and the sea along the south edge. The helpers here
-// answer what the rest of the game asks about the ground: is this point a road, does this circle
-// hit a building, which district is this, where is the nearest road.
-import { BEACH_Y, CITY_SEED, DISTRICTS, PALETTE, PLACES, ROAD_XS, ROAD_YS, WATER_Y, WORLD } from './config.js';
-import { createRandom, pickInt, pickOne } from './random.js';
+// world.js — the city of Porto Lumen: its roads, blocks, buildings, parks,
+// beach and districts, all generated once from a fixed seed so the map is
+// the same on every load. It also answers collision questions: is a point
+// on a road, in the sea, or inside a building.
+import { AVENUES, STREETS, ROAD_W, WORLD_W, WORLD_H, WATER_Y, SAND_Y, SIDEWALK, PALETTE } from './config.js';
+import { mulberry32, pick, range, int } from './random.js';
 
-const HALF_ROAD = WORLD.roadWidth / 2;
-const BLOCK_MARGIN = 22;
+// Named districts, each a rectangle with a label the HUD shows as you enter it.
+export const DISTRICTS = [
+  { name: 'Old Town', x: 0, y: 0, w: 1000, h: 800 },
+  { name: 'Porto Centro', x: 1000, y: 0, w: 1200, h: 1000 },
+  { name: 'Vista Hills', x: 2200, y: 0, w: 1400, h: 900 },
+  { name: 'The Docks', x: 2200, y: 900, w: 1400, h: 1500 },
+  { name: 'Marina', x: 0, y: 800, w: 1000, h: 1600 },
+  { name: 'Southside', x: 1000, y: 1000, w: 1200, h: 1400 },
+  { name: 'Lumen Beach', x: 0, y: 2400, w: 3600, h: 400 },
+];
 
-/** True when the point is on a road (within half a road's width of a road centre line). */
-export function isRoad(x, y) {
-  for (const rx of ROAD_XS) if (Math.abs(x - rx) <= HALF_ROAD) return true;
-  for (const ry of ROAD_YS) if (Math.abs(y - ry) <= HALF_ROAD) return true;
-  return false;
-}
+// Landmarks the missions and the HUD point at. Each is a named spot on the map.
+export const LANDMARKS = {
+  safehouse: { name: 'Safehouse', x: 1500, y: 1300, radius: 70 },
+  respray: { name: 'Spray & Go', x: 2700, y: 600, radius: 70 },
+  hospital: { name: 'St. Lumen Hospital', x: 700, y: 950, radius: 70 },
+  gunshop: { name: 'Ammo Depot', x: 1900, y: 2000, radius: 70 },
+  garage: { name: "Vera's Garage", x: 1100, y: 1650, radius: 80 },
+  pier: { name: 'Lumen Pier', x: 1500, y: 2500, radius: 80 },
+  stadium: { name: 'Porto Stadium', x: 3100, y: 1650, radius: 90 },
+  plaza: { name: 'Plaza del Sol', x: 1500, y: 600, radius: 90 },
+};
 
-/** True when the point is on a sidewalk: beside a road, but not on the road itself. */
-export function isSidewalk(x, y) {
-  const margin = HALF_ROAD + 14;
-  for (const rx of ROAD_XS) if (Math.abs(x - rx) <= margin && Math.abs(x - rx) > HALF_ROAD) return true;
-  for (const ry of ROAD_YS) if (Math.abs(y - ry) <= margin && Math.abs(y - ry) > HALF_ROAD) return true;
-  return false;
-}
-
-/** The district a point falls in, by the named regions of the map. */
-export function districtAt(x, y) {
-  for (const d of DISTRICTS) if (x >= d.x0 && x < d.x1 && y >= d.y0 && y < d.y1) return d.name;
-  return 'Solmar';
-}
-
-/** The nearest point on any road centre line to (x, y). */
-export function nearestRoadPoint(x, y) {
-  let bestX = ROAD_XS[0];
-  let bestY = ROAD_YS[0];
-  let best = Infinity;
-  for (const rx of ROAD_XS) {
-    const d = Math.abs(x - rx);
-    if (d < best) { best = d; bestX = rx; }
-  }
-  best = Infinity;
-  for (const ry of ROAD_YS) {
-    const d = Math.abs(y - ry);
-    if (d < best) { best = d; bestY = ry; }
-  }
-  // The nearer of the closest vertical road and the closest horizontal road.
-  return Math.abs(x - bestX) < Math.abs(y - bestY) ? { x: bestX, y } : { x, y: bestY };
-}
-
-/**
- * Build the city: every block between the roads holds either buildings or a park, with trees.
- * A block is the rectangle between two neighbouring roads (or the map edge). The beach strip
- * and the water are drawn from the world's constants, not stored here.
- */
-export function createCity() {
-  const random = createRandom(CITY_SEED);
+export function buildWorld() {
+  const rng = mulberry32(20261124);
   const buildings = [];
-  const parks = [];
   const trees = [];
-  const blockXs = [0, ...ROAD_XS.map((x) => x + HALF_ROAD), WORLD.width];
-  const blockYs = [0, ...ROAD_YS.map((y) => y + HALF_ROAD), BEACH_Y];
-  // Block edges are the road edges: block i spans from the right edge of road i-1 to the left
-  // edge of road i. Recompute them as (road centre + half road) to (next road centre - half road).
-  const edgesX = [0];
-  for (const rx of ROAD_XS) { edgesX.push(rx - HALF_ROAD, rx + HALF_ROAD); }
-  edgesX.push(WORLD.width);
-  const edgesY = [0];
-  for (const ry of ROAD_YS) { edgesY.push(ry - HALF_ROAD, ry + HALF_ROAD); }
-  edgesY.push(BEACH_Y);
+  const parks = [];
 
-  for (let bx = 0; bx < edgesX.length - 1; bx += 2) {
-    for (let by = 0; by < edgesY.length - 1; by += 2) {
-      const x0 = edgesX[bx] + BLOCK_MARGIN;
-      const y0 = edgesY[by] + BLOCK_MARGIN;
-      const x1 = edgesX[bx + 1] - BLOCK_MARGIN;
-      const y1 = edgesY[by + 1] - BLOCK_MARGIN;
-      const w = x1 - x0;
-      const h = y1 - y0;
-      if (w < 60 || h < 60) continue;
-      // A few blocks are parks; the rest hold buildings. The block around the plaza is a park.
-      const isPlaza = Math.abs((x0 + x1) / 2 - PLACES.plaza.x) < 250 && Math.abs((y0 + y1) / 2 - PLACES.plaza.y) < 250;
-      if (isPlaza || random() < 0.16) {
-        parks.push({ x: x0, y: y0, w, h });
-        const count = pickInt(random, 6, 12);
-        for (let i = 0; i < count; i += 1) {
-          trees.push({ x: x0 + 14 + random() * (w - 28), y: y0 + 14 + random() * (h - 28), r: 9 + random() * 7 });
+  // The blocks between roads. Each block gets one or two buildings, or a park.
+  const xs = [0, ...AVENUES, WORLD_W];
+  const ys = [0, ...STREETS, SAND_Y];
+  for (let bi = 0; bi < xs.length - 1; bi++) {
+    for (let bj = 0; bj < ys.length - 1; bj++) {
+      const bx0 = xs[bi] + (bi === 0 ? 0 : ROAD_W / 2 + SIDEWALK);
+      const bx1 = xs[bi + 1] - (bi === xs.length - 2 ? 0 : ROAD_W / 2 + SIDEWALK);
+      const by0 = ys[bj] + (bj === 0 ? 0 : ROAD_W / 2 + SIDEWALK);
+      const by1 = ys[bj + 1] - (bj === ys.length - 2 ? 0 : ROAD_W / 2 + SIDEWALK);
+      const bw = bx1 - bx0;
+      const bh = by1 - by0;
+      if (bw < 90 || bh < 90) continue;
+      // A few blocks are parks, with trees instead of buildings.
+      if (rng() < 0.14) {
+        parks.push({ x: bx0, y: by0, w: bw, h: bh });
+        const n = int(rng, 6, 12);
+        for (let t = 0; t < n; t++) {
+          trees.push({ x: range(rng, bx0 + 14, bx1 - 14), y: range(rng, by0 + 14, by1 - 14), r: range(rng, 9, 15) });
         }
         continue;
       }
-      // One to four buildings in the block, split along its longer side.
-      const splits = w > h ? pickInt(random, 1, 3) : pickInt(random, 1, 2);
-      for (let i = 0; i < splits; i += 1) {
-        const horizontal = w > h;
-        const bw = horizontal ? w / splits - 14 : w - 14;
-        const bh = horizontal ? h - 14 : h / splits - 14;
-        const bx0 = horizontal ? x0 + (i * w) / splits + 7 : x0 + 7;
-        const by0 = horizontal ? y0 + 7 : y0 + (i * h) / splits + 7;
-        if (bw < 40 || bh < 40) continue;
-        const colour = pickInt(random, 0, PALETTE.building.length - 1);
-        buildings.push({
-          x: bx0, y: by0, w: bw, h: bh,
-          colour: PALETTE.building[colour],
-          roof: PALETTE.roof[colour],
-          floors: pickInt(random, 1, 5),
-        });
+      // Downtown blocks get taller, denser buildings.
+      const downtown = bx0 > 1000 && bx0 < 2200 && by0 < 1000;
+      const count = downtown ? int(rng, 2, 3) : int(rng, 1, 2);
+      for (let k = 0; k < count; k++) {
+        const w = range(rng, 70, Math.min(170, bw - 16));
+        const h = range(rng, 60, Math.min(150, bh - 16));
+        const x = range(rng, bx0 + 6, bx1 - w - 6);
+        const y = range(rng, by0 + 6, by1 - h - 6);
+        const b = { x, y, w, h, color: pick(rng, PALETTE.buildingRoof), tall: downtown && rng() < 0.5 };
+        // Keep buildings from overlapping each other.
+        if (buildings.some((o) => rectsOverlap(b, o, 8))) continue;
+        // Keep the landmark spots clear of buildings.
+        if (Object.values(LANDMARKS).some((lm) => dist(x + w / 2, y + h / 2, lm.x, lm.y) < lm.radius + 60)) continue;
+        buildings.push(b);
       }
-      // A tree or two on the block's corners.
-      if (random() < 0.6) trees.push({ x: x0 + 10, y: y0 + 10, r: 8 + random() * 5 });
-      if (random() < 0.6) trees.push({ x: x1 - 10, y: y1 - 10, r: 8 + random() * 5 });
+      // A tree or two on the block's edge.
+      if (rng() < 0.5) trees.push({ x: range(rng, bx0 + 12, bx1 - 12), y: range(rng, by0 + 12, by1 - 12), r: range(rng, 8, 12) });
     }
   }
-  // Palm trees along the beach.
-  for (let x = 60; x < WORLD.width; x += 90 + random() * 60) {
-    trees.push({ x, y: BEACH_Y + 18 + random() * 40, r: 10 + random() * 4, palm: true });
-  }
-  return { buildings, parks, trees, blockXs, blockYs };
+  return { buildings, trees, parks };
 }
 
-/**
- * Push a circle out of every building it overlaps and out of the water and the map edge.
- * Returns the corrected position; the caller keeps its own velocity.
- */
-export function collideCircle(city, x, y, radius) {
-  let px = x;
-  let py = y;
-  for (const b of city.buildings) {
-    const nx = Math.max(b.x, Math.min(px, b.x + b.w));
-    const ny = Math.max(b.y, Math.min(py, b.y + b.h));
-    const dx = px - nx;
-    const dy = py - ny;
-    const dist2 = dx * dx + dy * dy;
-    if (dist2 >= radius * radius) continue;
-    if (dist2 === 0) {
-      // The centre is inside the building: push it out along the shortest side.
-      const left = px - b.x;
-      const right = b.x + b.w - px;
-      const top = py - b.y;
-      const bottom = b.y + b.h - py;
-      const min = Math.min(left, right, top, bottom);
-      if (min === left) px = b.x - radius;
-      else if (min === right) px = b.x + b.w + radius;
-      else if (min === top) py = b.y - radius;
-      else py = b.y + b.h + radius;
-      continue;
-    }
-    const dist = Math.sqrt(dist2);
-    px = nx + (dx / dist) * radius;
-    py = ny + (dy / dist) * radius;
-  }
-  px = Math.max(radius, Math.min(WORLD.width - radius, px));
-  py = Math.max(radius, Math.min(WATER_Y - radius - 6, py));
-  return { x: px, y: py };
+function rectsOverlap(a, b, pad) {
+  return a.x - pad < b.x + b.w + pad && a.x + a.w + pad > b.x - pad && a.y - pad < b.y + b.h + pad && a.y + a.h + pad > b.y - pad;
+}
+function dist(x1, y1, x2, y2) {
+  return Math.hypot(x2 - x1, y2 - y1);
 }
 
-/** True when a circle of the given radius at (x, y) overlaps any building. */
-export function hitsBuilding(city, x, y, radius) {
-  for (const b of city.buildings) {
-    const nx = Math.max(b.x, Math.min(x, b.x + b.w));
-    const ny = Math.max(b.y, Math.min(y, b.y + b.h));
-    const dx = x - nx;
-    const dy = y - ny;
-    if (dx * dx + dy * dy < radius * radius) return true;
+export function districtAt(x, y) {
+  for (const d of DISTRICTS) {
+    if (x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h) return d.name;
   }
+  return 'Porto Lumen';
+}
+
+export function isWater(x, y) {
+  return y > WATER_Y;
+}
+export function isSand(x, y) {
+  return y > SAND_Y && y <= WATER_Y;
+}
+
+// Is the point on a road (within the asphalt, not the sidewalk)?
+export function isRoad(x, y) {
+  for (const ax of AVENUES) if (Math.abs(x - ax) < ROAD_W / 2) return true;
+  for (const sy of STREETS) if (Math.abs(y - sy) < ROAD_W / 2) return true;
   return false;
+}
+
+// The nearest road centre in each direction, used by traffic to pick a lane.
+export function nearestAvenue(x) {
+  let best = AVENUES[0];
+  for (const ax of AVENUES) if (Math.abs(ax - x) < Math.abs(best - x)) best = ax;
+  return best;
+}
+export function nearestStreet(y) {
+  let best = STREETS[0];
+  for (const sy of STREETS) if (Math.abs(sy - y) < Math.abs(best - y)) best = sy;
+  return best;
+}
+
+// Push a circle out of every building it overlaps. Returns true if it hit one.
+export function collideBuildings(world, x, y, radius) {
+  let hit = false;
+  for (const b of world.buildings) {
+    const cx = Math.max(b.x, Math.min(x, b.x + b.w));
+    const cy = Math.max(b.y, Math.min(y, b.y + b.h));
+    const dx = x - cx;
+    const dy = y - cy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < radius * radius) {
+      hit = true;
+      const d = Math.sqrt(d2) || 0.001;
+      const push = radius - d;
+      // The caller moves the circle by the returned offset.
+      x += (dx / d) * push;
+      y += (dy / d) * push;
+    }
+  }
+  return { x, y, hit };
+}
+
+// Keep a point inside the world and out of the sea.
+export function clampToWorld(x, y, radius) {
+  x = Math.max(radius, Math.min(WORLD_W - radius, x));
+  y = Math.max(radius, Math.min(WATER_Y - radius, y));
+  return { x, y };
 }
